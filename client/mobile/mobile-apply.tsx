@@ -288,11 +288,11 @@ export function mobileApply(ctx): void {
     }
   }, 'dsh-mobile-nav: sheet rise animation replay')
 
-  // 移动端文件守卫（issue #17 修正）：手机上点 dsh-web 渲染的文件链接会触发桌面
-  // 端 workspaces.openPath(open ...) —— 既打不开（路径在电脑上），又会抛
-  // "path open failed"。这里在捕获阶段拦截这类点击 / 键盘激活，改为弹一个提示，
-  // 并隐藏「添加工作区」入口（手机上配工作区无意义）；同时在文件链接旁注入
-  // 「复制」按钮，点它经主机 RPC 读取文件正文再写入剪贴板。只挂窄屏。
+  // 移动端文件链接增强（issue #17，2026-10 修订）：新版 DSH 点聊天里的文件链接会在
+  // 右侧栏打开文件预览（sidebarRight.openResource，手机也能看），不再触发桌面端
+  // workspaces.openPath(open ...)，所以**不再拦截点击**（旧守卫会吞掉现在有效的预览）。
+  // 这里只保留：在文件链接旁注入「复制」按钮（经主机 RPC 读取文件正文写入剪贴板），
+  // 并隐藏「添加工作区」入口（手机上配工作区无意义）。只挂窄屏。
   ctx.effect(() => {
     if (!narrow.matches) return () => {}
     // 尽量拿到当前工作区 cwd（文件链接文案是相对它的），传给主机 RPC 做精确解析；
@@ -325,7 +325,7 @@ export function mobileApply(ctx): void {
         { path: filePath, cwd: getWorkspaceCwd() },
       ) as Promise<{ ok: boolean; value?: { content: string; path: string; size: number }; error?: { message: string } }>
     return startFileGuard(readFile)
-  }, 'dsh-mobile-nav: file open guard + copy button + hide add-workspace (issue #17)')
+  }, 'dsh-mobile-nav: file copy button + hide add-workspace (issue #17)')
 
   // 手机上模型 / 提供方设置加载失败：上游 dsh-web 会渲染「加载提供方目录失败 /
   // Settings are unavailable in this browser」。这条文案不是 dsh-pocket 的，但手机侧

@@ -1,16 +1,15 @@
-// 移动端文件守卫（issue #17）：dsh-web 在手机上点「文件链接」会触发桌面端
-// workspaces.openPath(open <path>)，既打不开（文件在电脑上），又会抛
-// "path open failed". 这里做两件事：
-//   1) 捕获阶段拦截这类激活（点击 / 键盘），改为弹一个提示；
-//   2) 在每个文件链接旁注入一个「复制」按钮，点它经主机 RPC 读文件正文再写剪贴板。
-// 另外隐藏「添加工作区」入口（手机上配工作区无意义）。
+// 移动端文件链接增强（issue #17，2026-10 修订）：新版 DSH 点聊天里的文件链接会
+// 在右侧栏打开文件预览（sidebarRight.openResource('dsh-resource://file/...')，手机
+// 也能看），不再调用桌面端 workspaces.openPath(open <path>)。因此这里**不再拦截
+// 点击**（旧守卫会吞掉现在有效的预览点击），只保留两件事：
+//   1) 在「文案就是文件路径」的链接旁注入一个「复制」按钮，点它经主机 RPC 读文件
+//      正文再写剪贴板（按钮自带内联样式，不依赖 Pocket 旧 mobile.css 是否生效）；
+//   2) 隐藏「添加工作区」入口（手机上配工作区无意义）。
 // 移植自 dsh-web-mobile（MIT）。
 //
 // 识别方式：不依赖 dsh-web 的 hash 类名（每次构建都变），只认「文本像文件路径的
 // <button>/<a>」——文件链接按钮的文案就是路径（如 lib/proxy.mjs / /Users/.../x.ts）。
 
-/** 手机上点击文件时弹出的提示。 */
-const GUARD_MSG = '手机上无法直接打开电脑上的文件'
 /** 「添加工作区」入口的文案（随语言变化），两种都覆盖。 */
 const WS_LABELS = ['添加工作区', '添加工作区…', 'Add workspace', 'Add workspace…']
 /** 复制按钮文案。 */
@@ -23,10 +22,12 @@ interface ReadFileResponse {
   error?: { message: string };
 }
 
-/** 文本是否像文件路径：绝对路径 / 相对路径 / 带扩展名的目录路径。 */
+/** 文本是否像文件路径：只认「整段文案就是一条路径」，避免状态行/命令行等长文本误命中。 */
 function looksLikeFilePath(text: string | null): boolean {
   const t = (text ?? '').trim()
   if (t.length < 3 || t.length > 320) return false
+  // 真实文件链接的文案就是纯路径：带空格或中文的（过程状态行、命令输出等）一律不算。
+  if (/\s/.test(t) || /[\u3400-\u9fff]/.test(t)) return false
   if (/^(\/|~\/|\.\.?\/|[A-Za-z]:\\)/.test(t)) return true
   if (/\/[\w.\-]+\.\w{1,12}$/.test(t)) return true
   if (/[\w.\-]+\/[\w.\-]+\.\w{1,12}/.test(t)) return true
@@ -100,20 +101,6 @@ export function startFileGuard(
     }, 2600)
   }
 
-  // 捕获阶段拦截文件链接的激活。按钮的键盘激活（Enter/Space）会派发 click，
-  // 因此只拦 click 即可同时覆盖鼠标与键盘，避免重复处理。
-  const onClick = (event: MouseEvent): void => {
-    const target = event.target as HTMLElement | null
-    if (target === null) return
-    const el = target.closest('button, a') as HTMLElement | null
-    if (el === null) return
-    if (!looksLikeFilePath(el.textContent)) return
-    event.preventDefault()
-    event.stopImmediatePropagation()
-    showToast(GUARD_MSG)
-  }
-  document.addEventListener('click', onClick, true)
-
   // 在文件链接旁注入「复制」按钮：点它经主机 RPC 读文件正文再写剪贴板。
   // 用 data-mobile-nav-copy 标记已处理的链接，避免重复注入；React 重渲染会
   // 产生新元素（无标记），MutationObserver 重新补上按钮。
@@ -128,6 +115,20 @@ export function startFileGuard(
       btn.type = 'button'
       btn.setAttribute('data-mobile-nav', 'copy-file')
       btn.textContent = COPY_LABEL
+      // 自带内联样式：不依赖 Pocket 旧 mobile.css 是否生效（那个整表可能被别的
+      // 手机布局插件停用），否则深色主题下会退化成浏览器默认的灰色大按钮。
+      btn.style.height = '22px'
+      btn.style.padding = '0 8px'
+      btn.style.marginLeft = '6px'
+      btn.style.border = '1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, .14))'
+      btn.style.borderRadius = '6px'
+      btn.style.background = 'var(--dsw-alias-bg-layer-1, #2b2b2e)'
+      btn.style.color = 'var(--dsw-alias-label-primary, inherit)'
+      btn.style.fontFamily = 'inherit'
+      btn.style.fontSize = '11px'
+      btn.style.lineHeight = '1'
+      btn.style.cursor = 'pointer'
+      btn.style.verticalAlign = 'baseline'
       btn.addEventListener('click', async (e) => {
         e.preventDefault()
         e.stopPropagation()
@@ -191,7 +192,6 @@ export function startFileGuard(
   const disconnectWs = hideWsEntries()
 
   return () => {
-    document.removeEventListener('click', onClick, true)
     copyObserver.disconnect()
     disconnectWs()
     if (toastTimer !== null) window.clearTimeout(toastTimer)

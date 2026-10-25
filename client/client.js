@@ -450,12 +450,12 @@ function MobileDrawerFooter({ useSessions, downloadSessionLog, toggleSidebar, t 
 }
 
 // client/mobile/fileGuard.ts
-var GUARD_MSG = "\u624B\u673A\u4E0A\u65E0\u6CD5\u76F4\u63A5\u6253\u5F00\u7535\u8111\u4E0A\u7684\u6587\u4EF6";
 var WS_LABELS = ["\u6DFB\u52A0\u5DE5\u4F5C\u533A", "\u6DFB\u52A0\u5DE5\u4F5C\u533A\u2026", "Add workspace", "Add workspace\u2026"];
 var COPY_LABEL = "\u590D\u5236";
 function looksLikeFilePath(text) {
   const t = (text ?? "").trim();
   if (t.length < 3 || t.length > 320) return false;
+  if (/\s/.test(t) || /[\u3400-\u9fff]/.test(t)) return false;
   if (/^(\/|~\/|\.\.?\/|[A-Za-z]:\\)/.test(t)) return true;
   if (/\/[\w.\-]+\.\w{1,12}$/.test(t)) return true;
   if (/[\w.\-]+\/[\w.\-]+\.\w{1,12}/.test(t)) return true;
@@ -523,17 +523,6 @@ function startFileGuard(readFile) {
       if (toastEl !== null) toastEl.style.opacity = "0";
     }, 2600);
   };
-  const onClick = (event) => {
-    const target = event.target;
-    if (target === null) return;
-    const el = target.closest("button, a");
-    if (el === null) return;
-    if (!looksLikeFilePath(el.textContent)) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    showToast(GUARD_MSG);
-  };
-  document.addEventListener("click", onClick, true);
   const injectCopyButtons = () => {
     const links = document.querySelectorAll("button, a");
     links.forEach((el) => {
@@ -545,6 +534,18 @@ function startFileGuard(readFile) {
       btn.type = "button";
       btn.setAttribute("data-mobile-nav", "copy-file");
       btn.textContent = COPY_LABEL;
+      btn.style.height = "22px";
+      btn.style.padding = "0 8px";
+      btn.style.marginLeft = "6px";
+      btn.style.border = "1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, .14))";
+      btn.style.borderRadius = "6px";
+      btn.style.background = "var(--dsw-alias-bg-layer-1, #2b2b2e)";
+      btn.style.color = "var(--dsw-alias-label-primary, inherit)";
+      btn.style.fontFamily = "inherit";
+      btn.style.fontSize = "11px";
+      btn.style.lineHeight = "1";
+      btn.style.cursor = "pointer";
+      btn.style.verticalAlign = "baseline";
       btn.addEventListener("click", async (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -604,7 +605,6 @@ function startFileGuard(readFile) {
   };
   const disconnectWs = hideWsEntries();
   return () => {
-    document.removeEventListener("click", onClick, true);
     copyObserver.disconnect();
     disconnectWs();
     if (toastTimer !== null) window.clearTimeout(toastTimer);
@@ -1890,7 +1890,7 @@ function mobileApply(ctx) {
       { path: filePath, cwd: getWorkspaceCwd() }
     );
     return startFileGuard(readFile);
-  }, "dsh-mobile-nav: file open guard + copy button + hide add-workspace (issue #17)");
+  }, "dsh-mobile-nav: file copy button + hide add-workspace (issue #17)");
   ctx.effect(() => {
     if (!narrow.matches) return () => {
     };
