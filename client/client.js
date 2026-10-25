@@ -72,35 +72,6 @@ var POCKET_ENDPOINTS = Object.freeze({
   // 再写入剪贴板——因为手机无法直接打开电脑上的文件。
   fileRead: "pocket.fileRead"
 });
-function compareVersions(a, b) {
-  const pa = String(a).replace(/^[vV]/, "").split(".");
-  const pb = String(b).replace(/^[vV]/, "").split(".");
-  for (let i = 0; i < 3; i++) {
-    const x = parseInt(pa[i], 10) || 0;
-    const y = parseInt(pb[i], 10) || 0;
-    if (x !== y) return x - y;
-  }
-  const aPre = String(a).replace(/^[vV]/, "").match(/-.*$/)?.[0] ?? "";
-  const bPre = String(b).replace(/^[vV]/, "").match(/-.*$/)?.[0] ?? "";
-  if (!aPre && !bPre) return 0;
-  if (!aPre) return 1;
-  if (!bPre) return -1;
-  const aParts = aPre.slice(1).split(".");
-  const bParts = bPre.slice(1).split(".");
-  const len = Math.max(aParts.length, bParts.length);
-  for (let i = 0; i < len; i++) {
-    const ax = aParts[i] ?? "";
-    const bx = bParts[i] ?? "";
-    if (ax === bx) continue;
-    const aNum = /^\d+$/.test(ax);
-    const bNum = /^\d+$/.test(bx);
-    if (aNum && bNum) return Number(ax) - Number(bx);
-    if (aNum) return 1;
-    if (bNum) return -1;
-    return ax < bx ? -1 : 1;
-  }
-  return 0;
-}
 function redactStatus(s) {
   return {
     proxyRunning: s?.proxyRunning === true,
@@ -1983,27 +1954,9 @@ var zh2 = {
   "section": "\u624B\u673A\u8BBF\u95EE",
   "title": "\u{1F4F1} \u624B\u673A\u8BBF\u95EE",
   "subtitle": "\u624B\u673A\u626B\u7801\u6253\u5F00\u7684\u5C31\u662F\u7535\u8111\u4E0A\u7684\u8FD9\u4E2A\u754C\u9762\uFF0C\u5B9E\u65F6\u540C\u6B65",
-  "developer": "\u5F00\u53D1\u8005\uFF1A\u7A0B\u5E8F\u5458\u5C11\u5317\u6668",
-  "starAsk": "\u2B50 \u987A\u624B\u7559\u9897 Star\uFF0C\u4F5C\u8005\u80FD\u9AD8\u5174\u4E00\u6574\u5929",
-  "starCta": "\u884C\uFF0C\u7ED9\u4F60\u4E00\u9897 Star",
   "restarted": "\u{1F504} \u5DF2\u91CD\u542F",
   "ok": "\u77E5\u9053\u4E86",
   "bgHint": "\u8FDB\u7A0B\u5728\u540E\u53F0\u8FD0\u884C\uFF08\u4E0D\u6302\u7EC8\u7AEF\uFF09\u3002\u5982\u9700\u505C\u6B62\uFF1A{cmd}",
-  "updatedRestart": "\u2705 \u5DF2\u66F4\u65B0 v{ver}\uFF0C\u91CD\u542F\u751F\u6548",
-  "updateAutoRestarting": "\u2705 \u5DF2\u66F4\u65B0 v{ver}\uFF0C\u6B63\u5728\u81EA\u52A8\u91CD\u542F\u2026",
-  "updatedOk": "\u2705 \u5DF2\u66F4\u65B0 v{ver}",
-  "updateAvailable": "\u{1F4E6} \u65B0\u7248\u672C v{ver}",
-  "updating": "\u66F4\u65B0\u4E2D\u2026",
-  "updateTo": "\u66F4\u65B0\u5230 v{ver}",
-  "restartingNow": "\u6B63\u5728\u91CD\u542F\u751F\u6548\u2026",
-  "restarting": "\u91CD\u542F\u4E2D\u2026",
-  "restartNow": "\u{1F504} \u91CD\u542F dsh web \u751F\u6548",
-  "updatingDetail": "\u23F3 \u66F4\u65B0\u4E2D\uFF08\u901A\u5E38 1-2 \u5206\u949F\uFF09\xB7 \u5DF2\u7B49\u5F85 {s} \u79D2",
-  "restartingDetail": "\u23F3 \u6B63\u5728\u91CD\u542F\u751F\u6548\uFF08\u901A\u5E38 10-30 \u79D2\uFF09\xB7 \u5DF2\u7B49\u5F85 {s} \u79D2",
-  "updatedAutoDetail": "\u2705 \u5DF2\u66F4\u65B0\uFF0C\u6B63\u5728\u81EA\u52A8\u91CD\u542F\u751F\u6548\uFF0C\u8BF7\u7A0D\u5019\u5237\u65B0",
-  "updatedRestartDetail": "\u2705 \u5DF2\u66F4\u65B0\uFF0C\u91CD\u542F dsh web \u751F\u6548",
-  "updateFailed": "\u274C \u5931\u8D25\uFF1A{err}\uFF08\u624B\u52A8\u66F4\u65B0\uFF1Adsh plugin --profile web update dsh-pocket --latest -w\uFF09",
-  "versionRange": "\u5F53\u524D v{cur} \u2192 \u6700\u65B0 v{latest}",
   "wanAccess": "\u516C\u7F51\u8BBF\u95EE",
   "pinLabel": "\u8BBF\u95EE\u5BC6\u7801",
   "modeLabel": "\u5730\u5740\u6A21\u5F0F",
@@ -2074,34 +2027,15 @@ var zh2 = {
   "connecting": "\u23F3 \u8FDE\u63A5 Cloudflare \u8FB9\u7F18\uFF08\u901A\u5E38 5-30 \u79D2\uFF09\xB7 \u5DF2\u7B49\u5F85 {s} \u79D2{suffix}",
   "slowHint": " \u2014 \u6709\u70B9\u4E45\uFF1F\u68C0\u67E5\u662F\u5426\u5F00\u7740\u4EE3\u7406/VPN\uFF08Clash TUN \u7B49\uFF09",
   "error": "\u274C \u5F00\u542F\u5931\u8D25\uFF1A{detail}\uFF08\u53EF\u91CD\u8BD5\uFF1B\u82E5\u662F\u4EE3\u7406/VPN \u95EE\u9898\u89C1 README \u6392\u969C\uFF09",
-  "unknownError": "\u672A\u77E5\u9519\u8BEF",
-  "feedback": "\u6709\u95EE\u9898\uFF1F\u6B22\u8FCE\u5230 GitHub Issues \u53CD\u9988 \u{1F64F}"
+  "unknownError": "\u672A\u77E5\u9519\u8BEF"
 };
 var en2 = {
   "section": "Phone access",
   "title": "\u{1F4F1} Phone access",
   "subtitle": "The phone shows this exact screen, live",
-  "developer": "Developer: \u5C11\u5317\u6668 (shaobeichen)",
-  "starAsk": "\u2B50 Drop a Star if it helped \u2014 it makes the author\u2019s day",
-  "starCta": "\u2605 Give a Star",
   "restarted": "\u{1F504} Restarted",
   "ok": "Got it",
   "bgHint": "Running in the background (not attached to a terminal). To stop: {cmd}",
-  "updatedRestart": "\u2705 Updated to v{ver} \u2014 restart to apply",
-  "updateAutoRestarting": "\u2705 Updated to v{ver} \u2014 auto-restarting\u2026",
-  "updatedOk": "\u2705 Updated to v{ver}",
-  "updateAvailable": "\u{1F4E6} Update available: v{ver}",
-  "updating": "Updating\u2026",
-  "updateTo": "Update to v{ver}",
-  "restartingNow": "Restarting to apply\u2026",
-  "restarting": "Restarting\u2026",
-  "restartNow": "\u{1F504} Restart dsh web now",
-  "updatingDetail": "\u23F3 Updating (usually 1-2 min) \xB7 {s}s elapsed",
-  "restartingDetail": "\u23F3 Restarting to apply (usually 10-30s) \xB7 {s}s elapsed",
-  "updatedAutoDetail": "\u2705 Updated \u2014 auto-restarting in progress, refresh shortly",
-  "updatedRestartDetail": "\u2705 Updated \u2014 restart dsh web to apply",
-  "updateFailed": "\u274C Failed: {err} (manual update: dsh plugin --profile web update dsh-pocket --latest -w)",
-  "versionRange": "Current v{cur} \u2192 latest v{latest}",
   "wanAccess": "Public access",
   "pinLabel": "Access PIN",
   "modeLabel": "Address mode",
@@ -2172,8 +2106,7 @@ var en2 = {
   "connecting": "\u23F3 Connecting to Cloudflare edge (usually 5-30s) \xB7 {s}s elapsed{suffix}",
   "slowHint": " \u2014 taking long? Check for a proxy/VPN (e.g., Clash TUN)",
   "error": "\u274C Failed to enable: {detail} (you can retry; for proxy/VPN issues see the README)",
-  "unknownError": "unknown error",
-  "feedback": "\u{1F64F} Questions? Open an issue on GitHub"
+  "unknownError": "unknown error"
 };
 
 // client/index.jsx
@@ -2211,7 +2144,6 @@ function PocketSettingsTab({ rpcCall, t }) {
   const [error, setError] = (0, import_react2.useState)(null);
   const [tunnelState, setTunnelState] = (0, import_react2.useState)(null);
   const [restartNotice, setRestartNotice] = (0, import_react2.useState)(false);
-  const [updateInfo, setUpdateInfo] = (0, import_react2.useState)(null);
   const [isDesktop, setIsDesktop] = (0, import_react2.useState)(false);
   const [now, setNow] = (0, import_react2.useState)(Date.now());
   (0, import_react2.useEffect)(() => {
@@ -2233,7 +2165,6 @@ function PocketSettingsTab({ rpcCall, t }) {
       if (s.desktop) setIsDesktop(true);
       if (s.restartNotice) {
         setRestartNotice(true);
-        setUpdateInfo(null);
         if (!sessionStorage.getItem("dshp-auto-reloaded")) {
           sessionStorage.setItem("dshp-auto-reloaded", "1");
           setTimeout(() => {
@@ -2258,62 +2189,6 @@ function PocketSettingsTab({ rpcCall, t }) {
     } catch {
     }
   }, []);
-  (0, import_react2.useEffect)(() => {
-    if (isDesktop) return;
-    let alive = true;
-    const check = async () => {
-      try {
-        const v = await call(POCKET_ENDPOINTS.version, {});
-        const meta = await (await fetch("https://registry.npmjs.org/dsh-pocket/latest", { cache: "no-store" })).json();
-        if (!alive) return;
-        const latest = typeof meta?.version === "string" ? meta.version : null;
-        if (latest && v.current && compareVersions(latest, v.current) > 0) {
-          setUpdateInfo({ current: v.current, latest, updating: false, result: null });
-        } else if (v.current && v.loaded && compareVersions(v.current, v.loaded) > 0) {
-          setUpdateInfo({ current: v.current, latest: v.current, updating: false, result: "ok", updated: true });
-        }
-      } catch {
-      }
-    };
-    check();
-    const t2 = setInterval(check, 5 * 60 * 1e3);
-    return () => {
-      alive = false;
-      clearInterval(t2);
-    };
-  }, [isDesktop]);
-  const restartPocket = async () => {
-    setUpdateInfo((u) => ({ ...u, restarting: true, startedAt: Date.now() }));
-    try {
-      await Promise.race([
-        call(POCKET_ENDPOINTS.restart, {}),
-        new Promise((_, rej) => setTimeout(() => rej(new Error("restart requested (no reply within 3s)")), 3e3))
-      ]);
-      setUpdateInfo((u) => ({ ...u, restarting: true, result: "ok" }));
-    } catch (err) {
-      const msg = String(err?.message ?? "");
-      if (/connection|socket|fetch|network|abort|cancelled|ECONN|disconnect|closed|timeout/i.test(msg)) {
-        setUpdateInfo((u) => ({ ...u, restarting: true, result: "ok" }));
-        return;
-      }
-      setUpdateInfo((u) => ({ ...u, restarting: false, result: "fail", output: err.message }));
-    }
-  };
-  const runUpdate = async () => {
-    setUpdateInfo((u) => ({ ...u, updating: true, result: null, startedAt: Date.now() }));
-    try {
-      const r = await call(POCKET_ENDPOINTS.update, {});
-      setUpdateInfo((u) => ({
-        ...u,
-        updating: false,
-        result: r.ok ? "ok" : "fail",
-        autoRestart: r.autoRestart === true,
-        output: r.output ?? r.error
-      }));
-    } catch (err) {
-      setUpdateInfo((u) => ({ ...u, updating: false, result: "fail", output: err.message }));
-    }
-  };
   const [disclaimerOpen, setDisclaimerOpen] = (0, import_react2.useState)(false);
   const [disclaimerChecked, setDisclaimerChecked] = (0, import_react2.useState)(false);
   const doStartTunnel = async () => {
@@ -2533,26 +2408,10 @@ function PocketSettingsTab({ rpcCall, t }) {
     { style: styles.card },
     (0, import_react2.createElement)(
       "div",
-      { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 } },
-      (0, import_react2.createElement)(
-        "div",
-        null,
-        (0, import_react2.createElement)("strong", null, t("title")),
-        (0, import_react2.createElement)("div", { style: styles.muted }, t("subtitle"))
-      ),
-      (0, import_react2.createElement)(
-        "div",
-        { style: { fontSize: 12, color: "var(--dsw-alias-label-tertiary,#8b93a1)", textAlign: "right" } },
-        (0, import_react2.createElement)("div", { style: { whiteSpace: "nowrap" } }, t("developer")),
-        (0, import_react2.createElement)("div", { style: { whiteSpace: "nowrap" } }, t("starAsk")),
-        (0, import_react2.createElement)(
-          "a",
-          { href: "https://github.com/shaobeichen/dsh-pocket", target: "_blank", rel: "noreferrer", style: { color: "var(--dsw-alias-brand-primary,#4f6ef7)", fontSize: 12, lineHeight: 1.6, textDecoration: "underline" } },
-          t("starCta")
-        )
-      )
+      null,
+      (0, import_react2.createElement)("strong", null, t("title")),
+      (0, import_react2.createElement)("div", { style: styles.muted }, t("subtitle"))
     ),
-    // 桌面端不显示更新/重启横幅（更新由 DSH Desktop 管理），也不需要额外提示
     // 重启后提示（进程在后台运行，停止方法）——左侧蓝色色条（桌面端不会触发本插件的自重启）
     !isDesktop && restartNotice ? (0, import_react2.createElement)(
       "div",
@@ -2564,27 +2423,6 @@ function PocketSettingsTab({ rpcCall, t }) {
         (0, import_react2.createElement)("button", { style: styles.btn, onClick: () => setRestartNotice(false) }, t("ok"))
       ),
       (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 4, wordBreak: "break-all" }, fmt(t, "bgHint", { cmd: status?.killHint ?? `lsof -ti :${status?.dshPort ?? 3080} | xargs kill -9` }))
-    ) : null,
-    // 更新提示——左侧黄色色条（提示有新版本）；单状态：有更新/更新中/已更新自动重启，不并存
-    // 桌面端不渲染（更新由 DSH Desktop 管理）
-    !isDesktop && updateInfo ? (0, import_react2.createElement)(
-      "div",
-      { style: { ...styles.block, borderLeft: "4px solid var(--dsw-alias-state-warn-primary,#b45309)", borderRadius: 8, background: "var(--dsw-alias-bg-layer-2,#f3f4f6)", padding: "10px 12px" } },
-      (0, import_react2.createElement)(
-        "div",
-        { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 } },
-        (0, import_react2.createElement)(
-          "div",
-          { style: { fontWeight: 600, fontSize: 13 } },
-          updateInfo.updated ? fmt(t, "updatedRestart", { ver: updateInfo.current }) : updateInfo.result === "ok" ? updateInfo.autoRestart ? fmt(t, "updateAutoRestarting", { ver: updateInfo.latest }) : fmt(t, "updatedOk", { ver: updateInfo.latest }) : fmt(t, "updateAvailable", { ver: updateInfo.latest })
-        ),
-        updateInfo.result !== "ok" ? (0, import_react2.createElement)("button", { style: styles.primary, onClick: runUpdate, disabled: updateInfo.updating }, updateInfo.updating ? t("updating") : fmt(t, "updateTo", { ver: updateInfo.latest })) : updateInfo.autoRestart ? (0, import_react2.createElement)("button", { style: styles.btn, disabled: true }, t("restartingNow")) : (0, import_react2.createElement)("button", { style: styles.primary, onClick: restartPocket, disabled: updateInfo.restarting }, updateInfo.restarting ? t("restarting") : t("restartNow"))
-      ),
-      (0, import_react2.createElement)(
-        "div",
-        { style: styles.muted, marginTop: 4 },
-        updateInfo.updating ? fmt(t, "updatingDetail", { s: elapsed(updateInfo.startedAt) }) : updateInfo.restarting ? fmt(t, "restartingDetail", { s: elapsed(updateInfo.startedAt) }) : updateInfo.result === "ok" ? updateInfo.autoRestart ? t("updatedAutoDetail") : t("updatedRestartDetail") : updateInfo.result === "fail" ? fmt(t, "updateFailed", { err: errText(updateInfo.output) || t("unknownError") }) : fmt(t, "versionRange", { cur: updateInfo.current, latest: updateInfo.latest })
-      )
     ) : null,
     // 局域网：标题行自带总开关 → 二维码+地址 → 设置行（访问密码 / 高级·手动选地址）
     (0, import_react2.createElement)(
@@ -2844,17 +2682,7 @@ function PocketSettingsTab({ rpcCall, t }) {
         ),
         !disclaimerChecked ? (0, import_react2.createElement)("div", { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-state-error-primary,#dc2626)" } }, t("disclaimerHint")) : null
       )
-    ) : null,
-    // 页面最底部：反馈入口
-    (0, import_react2.createElement)(
-      "div",
-      { style: { ...styles.block, textAlign: "center" } },
-      (0, import_react2.createElement)(
-        "a",
-        { href: "https://github.com/shaobeichen/dsh-pocket/issues", target: "_blank", rel: "noreferrer", style: { fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)", textDecoration: "none" } },
-        t("feedback")
-      )
-    )
+    ) : null
   );
 }
 function apply(ctx) {

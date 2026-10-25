@@ -211,3 +211,22 @@ test('Windows 更新 spawn（PR #54）：performUpdate 的 spawn 必须带 shell
   const seg = src.slice(src.indexOf("spawn('dsh'"), src.indexOf('spawn(\'dsh\')') + 500);
   assert.ok(src.includes("shell: process.platform === 'win32'"), 'spawn 带 shell: win32（npm shim ENOENT / Node22 EINVAL）');
 });
+
+test('设置页开关跟随主题反色（回归：深色主题白钮贴白轨看不出状态）', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../client/client.js', import.meta.url), 'utf8');
+  // 深色主题会把 brand-primary / button-primary-fill 反成浅色底。圆钮必须用 label-primary-foreground
+  // 跟着反色（浅色轨道 + 深色圆钮）；OFF 态分别用 border-l3 / switch-thumb。硬编码 #fff 会在
+  // 深色主题下变成白底白钮，ON/OFF 两态糊成一块。
+  assert.ok(src.includes('--dsw-alias-switch-thumb'), '开关圆钮使用 switch-thumb token（OFF）');
+  assert.ok(src.includes('--dsw-alias-border-l3'), '开关轨道使用 border-l3 token（OFF）');
+  assert.ok(!src.includes('background: "#fff"'), '开关不得再硬编码纯白圆钮');
+});
+
+test('定制：设置页不再包含开发者信息 / 求 Star / 底部反馈 / 自动更新入口', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../client/client.js', import.meta.url), 'utf8');
+  for (const key of ['developer', 'starAsk', 'starCta', 'feedback', 'updateAvailable', 'updateTo', 'versionRange']) {
+    assert.ok(!src.includes(`"${key}"`), `bundle 不得再包含设置页文案 key: ${key}`);
+  }
+});

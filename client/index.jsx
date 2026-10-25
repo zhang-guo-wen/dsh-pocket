@@ -1,5 +1,5 @@
 // dsh-pocket 网页客户端：
-//   1. 设置页签「手机访问」（局域网/公网二维码 + 更新/重启提示）
+//   1. 设置页签「手机访问」（局域网/公网二维码 + 重启提示）
 //   2. 移动端适配（移植自 MIT 项目 dsh-web-mobile，见 client/mobile/LICENSE.dsh-web-mobile）
 //
 // 手机扫码打开的就是电脑上的 dsh web，实时同步；窄屏自动变成抽屉布局。
@@ -9,7 +9,7 @@
 
 import { createElement as h, useEffect, useRef, useState } from 'react';
 
-import { POCKET_RPC_CHANNEL, POCKET_ENDPOINTS, MOBILE_RIGHTBAR_ATTRIBUTE, MOBILE_RIGHTBAR_EVENT, redactStatus, compareVersions } from './api.js';
+import { POCKET_RPC_CHANNEL, POCKET_ENDPOINTS, MOBILE_RIGHTBAR_ATTRIBUTE, MOBILE_RIGHTBAR_EVENT, redactStatus } from './api.js';
 import { mobileApply } from './mobile/mobile-apply.tsx';
 import { NS as POCKET_NS, zh as POCKET_ZH, en as POCKET_EN } from './pocket-locales.js';
 
@@ -56,8 +56,7 @@ function PocketSettingsTab({ rpcCall, t }) {
   const [error, setError] = useState(null);
   const [tunnelState, setTunnelState] = useState(null); // 隧道进度 {phase, detail, startedAt}
   const [restartNotice, setRestartNotice] = useState(false); // 重启后提示
-  const [updateInfo, setUpdateInfo] = useState(null); // { current, latest, updating, result, startedAt } | null
-  const [isDesktop, setIsDesktop] = useState(false); // DSH Desktop（Electron）环境：更新/重启由桌面版管理
+  const [isDesktop, setIsDesktop] = useState(false); // DSH Desktop（Electron）环境
   const [now, setNow] = useState(Date.now()); // 每秒 tick，驱动倒计时
 
   // 进行中操作的「已等待 X 秒」倒计时
@@ -81,10 +80,8 @@ function PocketSettingsTab({ rpcCall, t }) {
       setTunnelState(s.tunnelState ?? null);
       if (s.desktop) setIsDesktop(true);
       if (s.restartNotice) {
-        // 新进程确认起来了：显示一次「已重启」，清掉旧的更新横幅（单状态，不并存），
-        // 然后自动刷新页面加载新代码——不用用户手动刷新
+        // 新进程确认起来了：显示一次「已重启」，然后自动刷新页面加载新代码——不用用户手动刷新
         setRestartNotice(true);
-        setUpdateInfo(null);
         if (!sessionStorage.getItem('dshp-auto-reloaded')) {
           sessionStorage.setItem('dshp-auto-reloaded', '1');
           setTimeout(() => { try { location.reload(); } catch { /* 忽略 */ } }, 2000);
@@ -103,72 +100,6 @@ function PocketSettingsTab({ rpcCall, t }) {
   useEffect(() => {
     try { sessionStorage.removeItem('dshp-auto-reloaded'); } catch { /* 忽略 */ }
   }, []);
-
-  // 版本检测：host 当前版本 vs npm registry latest（registry 带 CORS *）
-  // 两种情况显示横幅：① 有新版可更新；② 磁盘已更新但进程还是旧代码（重启生效）
-  // cache: 'no-store' —— registry 响应带缓存头，浏览器会缓存旧版本号导致「小版本不提示」
-  // 周期重查（每 5 分钟）：npm registry 的 /latest 走 CDN 边缘缓存，刚发布后打开页面
-  // 可能拿到旧版本号——周期性重查让更新提示在缓存刷新后自动出现，不用重开页面。
-  // 桌面端（isDesktop）：更新/重启由 DSH Desktop 管理，这里不做版本检测、不显示更新横幅
-  useEffect(() => {
-    if (isDesktop) return;
-    let alive = true;
-    const check = async () => {
-      try {
-        const v = await call(POCKET_ENDPOINTS.version, {});
-        const meta = await (await fetch('https://registry.npmjs.org/dsh-pocket/latest', { cache: 'no-store' })).json();
-        if (!alive) return;
-        const latest = typeof meta?.version === 'string' ? meta.version : null;
-        if (latest && v.current && compareVersions(latest, v.current) > 0) {
-          setUpdateInfo({ current: v.current, latest, updating: false, result: null });
-        } else if (v.current && v.loaded && compareVersions(v.current, v.loaded) > 0) {
-          // 已更新未重启：显示「已更新，重启生效」+ 重启按钮
-          setUpdateInfo({ current: v.current, latest: v.current, updating: false, result: 'ok', updated: true });
-        }
-      } catch { /* 网络失败静默 */ }
-    };
-    check();
-    const t = setInterval(check, 5 * 60 * 1000);
-    return () => { alive = false; clearInterval(t); };
-  }, [isDesktop]);
-
-  // 重启宿主（更新生效必需：刷新页面不会重载服务端代码）
-  const restartPocket = async () => {
-    setUpdateInfo((u) => ({ ...u, restarting: true, startedAt: Date.now() }));
-    try {
-      // 宿主 500ms 后自杀，RPC 响应可能来不及送达 → 3 秒超时兜底，别让按钮永远卡「重启中…」
-      await Promise.race([
-        call(POCKET_ENDPOINTS.restart, {}),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('restart requested (no reply within 3s)')), 3000)),
-      ]);
-      setUpdateInfo((u) => ({ ...u, restarting: true, result: 'ok' }));
-    } catch (err) {
-      // 网络断连/超时同样视为「已请求重启」——旧进程即将退出，等新进程起来后刷新即可
-      const msg = String(err?.message ?? '');
-      if (/connection|socket|fetch|network|abort|cancelled|ECONN|disconnect|closed|timeout/i.test(msg)) {
-        setUpdateInfo((u) => ({ ...u, restarting: true, result: 'ok' }));
-        return;
-      }
-      setUpdateInfo((u) => ({ ...u, restarting: false, result: 'fail', output: err.message }));
-    }
-  };
-
-  // 一键更新：调宿主 dsh plugin update（成功后宿主自动重启生效，用户只点一次）
-  const runUpdate = async () => {
-    setUpdateInfo((u) => ({ ...u, updating: true, result: null, startedAt: Date.now() }));
-    try {
-      const r = await call(POCKET_ENDPOINTS.update, {});
-      setUpdateInfo((u) => ({
-        ...u,
-        updating: false,
-        result: r.ok ? 'ok' : 'fail',
-        autoRestart: r.autoRestart === true,
-        output: r.output ?? r.error,
-      }));
-    } catch (err) {
-      setUpdateInfo((u) => ({ ...u, updating: false, result: 'fail', output: err.message }));
-    }
-  };
 
   // 安全免责声明（issue #31）：每次开启公网都必须先弹框勾选「我已知情」。
   // 服务端同样强制（tunnel.start 需 disclaimer: true），防绕过前端直接调 RPC。
@@ -392,20 +323,10 @@ function PocketSettingsTab({ rpcCall, t }) {
   const [advOpen, setAdvOpen] = useState(false);
 
   return h('div', { style: styles.card },
-    h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
-      h('div', null,
-        h('strong', null, t('title')),
-        h('div', { style: styles.muted }, t('subtitle')),
-      ),
-      h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-tertiary,#8b93a1)', textAlign: 'right' } },
-        h('div', { style: { whiteSpace: 'nowrap' } }, t('developer')),
-        h('div', { style: { whiteSpace: 'nowrap' } }, t('starAsk')),
-        h('a', { href: 'https://github.com/shaobeichen/dsh-pocket', target: '_blank', rel: 'noreferrer', style: { color: 'var(--dsw-alias-brand-primary,#4f6ef7)', fontSize: 12, lineHeight: 1.6, textDecoration: 'underline' } },
-          t('starCta')),
-      ),
+    h('div', null,
+      h('strong', null, t('title')),
+      h('div', { style: styles.muted }, t('subtitle')),
     ),
-
-    // 桌面端不显示更新/重启横幅（更新由 DSH Desktop 管理），也不需要额外提示
 
     // 重启后提示（进程在后台运行，停止方法）——左侧蓝色色条（桌面端不会触发本插件的自重启）
     !isDesktop && restartNotice ? h('div', { style: { ...styles.block, borderLeft: '4px solid var(--dsw-alias-brand-primary,#4f6ef7)', borderRadius: 8, background: 'var(--dsw-alias-bg-layer-2,#f3f4f6)', padding: '10px 12px' } },
@@ -414,34 +335,6 @@ function PocketSettingsTab({ rpcCall, t }) {
         h('button', { style: styles.btn, onClick: () => setRestartNotice(false) }, t('ok')),
       ),
       h('div', { style: styles.muted, marginTop: 4, wordBreak: 'break-all' }, fmt(t, 'bgHint', { cmd: status?.killHint ?? `lsof -ti :${status?.dshPort ?? 3080} | xargs kill -9` })),
-    ) : null,
-
-    // 更新提示——左侧黄色色条（提示有新版本）；单状态：有更新/更新中/已更新自动重启，不并存
-    // 桌面端不渲染（更新由 DSH Desktop 管理）
-    !isDesktop && updateInfo ? h('div', { style: { ...styles.block, borderLeft: '4px solid var(--dsw-alias-state-warn-primary,#b45309)', borderRadius: 8, background: 'var(--dsw-alias-bg-layer-2,#f3f4f6)', padding: '10px 12px' } },
-      h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
-        h('div', { style: { fontWeight: 600, fontSize: 13 } },
-          updateInfo.updated
-            ? fmt(t, 'updatedRestart', { ver: updateInfo.current })
-            : updateInfo.result === 'ok'
-              ? (updateInfo.autoRestart ? fmt(t, 'updateAutoRestarting', { ver: updateInfo.latest }) : fmt(t, 'updatedOk', { ver: updateInfo.latest }))
-              : fmt(t, 'updateAvailable', { ver: updateInfo.latest })),
-        updateInfo.result !== 'ok'
-          ? h('button', { style: styles.primary, onClick: runUpdate, disabled: updateInfo.updating }, updateInfo.updating ? t('updating') : fmt(t, 'updateTo', { ver: updateInfo.latest }))
-          : updateInfo.autoRestart
-            ? h('button', { style: styles.btn, disabled: true }, t('restartingNow'))
-            : h('button', { style: styles.primary, onClick: restartPocket, disabled: updateInfo.restarting }, updateInfo.restarting ? t('restarting') : t('restartNow')),
-      ),
-      h('div', { style: styles.muted, marginTop: 4 },
-        updateInfo.updating
-          ? fmt(t, 'updatingDetail', { s: elapsed(updateInfo.startedAt) })
-        : updateInfo.restarting
-          ? fmt(t, 'restartingDetail', { s: elapsed(updateInfo.startedAt) })
-        : updateInfo.result === 'ok'
-          ? (updateInfo.autoRestart ? t('updatedAutoDetail')
-            : t('updatedRestartDetail'))
-        : updateInfo.result === 'fail' ? fmt(t, 'updateFailed', { err: errText(updateInfo.output) || t('unknownError') })
-        : fmt(t, 'versionRange', { cur: updateInfo.current, latest: updateInfo.latest })),
     ) : null,
 
     // 局域网：标题行自带总开关 → 二维码+地址 → 设置行（访问密码 / 高级·手动选地址）
@@ -644,12 +537,6 @@ function PocketSettingsTab({ rpcCall, t }) {
         !disclaimerChecked ? h('div', { style: { marginTop: 8, fontSize: 12, color: 'var(--dsw-alias-state-error-primary,#dc2626)' } }, t('disclaimerHint')) : null,
       ),
     ) : null,
-
-    // 页面最底部：反馈入口
-    h('div', { style: { ...styles.block, textAlign: 'center' } },
-      h('a', { href: 'https://github.com/shaobeichen/dsh-pocket/issues', target: '_blank', rel: 'noreferrer', style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)', textDecoration: 'none' } },
-        t('feedback')),
-    ),
   );
 }
 
