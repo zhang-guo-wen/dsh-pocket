@@ -1,8 +1,10 @@
 // dsh-web-mobile 移植（MIT，见 LICENSE.dsh-web-mobile）：移动端适配的 client 侧实现。
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { MobileNavToggle } from './MobileNavToggle.tsx'
 import { MobileNavOverlay } from './MobileNavOverlay.tsx'
 import { MobileDrawerFooter } from './MobileDrawerFooter.tsx'
+import type { SessionLogDownloadState } from './MobileDrawerFooter.tsx'
 import { startFileGuard } from './fileGuard.ts'
 import { MOBILE_CSS } from './mobile.css.ts'
 import { POCKET_RPC_CHANNEL, POCKET_ENDPOINTS, MOBILE_RIGHTBAR_ATTRIBUTE, MOBILE_RIGHTBAR_EVENT } from '../api.js'
@@ -380,17 +382,22 @@ export function mobileApply(ctx): void {
     }),
   }, MobileNavOverlay))
 
-  // Session log download, relocated from the session header to the drawer
-  // footer on mobile (the header capsule is hidden by CSS); the drawer
-  // footer also hosts the Files action that opens the dsh-web-ui explorer
-  // sheet.
+  const sessionLogDownload = createSnapshotStore<SessionLogDownloadState>({ download: undefined })
+  ctx.inject(['sessionLogDownload'], (scope: ClientContext) => {
+    scope.effect(() => {
+      sessionLogDownload.set({ download: (sessionId) => scope.sessionLogDownload.download(sessionId) })
+      return () => { sessionLogDownload.set({ download: undefined }) }
+    }, 'dsh-mobile-nav: optional session log download')
+  })
+
+  // Files remains available when the host disables Session log export.
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
     name: 'sidebar.footer.action',
     id: 'mobile-nav-session-log',
     order: 10,
     locale: NS,
     inject: () => ({
-      downloadSessionLog: (sessionId: string) => ctx.sessionLogDownload.download(sessionId),
+      hooks: { sessionLogDownload },
       toggleSidebar: () => ctx.layout.toggleSidebar(),
     }),
   }, MobileDrawerFooter))

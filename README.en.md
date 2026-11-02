@@ -58,6 +58,8 @@ What it looks like — the phone shows the exact same UI as your computer, live:
 | 🔁 Tunnel auto-restore       | After a DSH restart the previously-running public tunnel comes back automatically                                                                                                                                                                                                 |
 | 🧩 Zero-dependency install   | One npm package, one settings tab — no core/adapter split, no account, no server                                                                                                                                                                                                  |
 
+Session log download is optional: the phone drawer shows its download button while the host export service is enabled. Disabling or unloading that service hides the button without affecting phone access or the Files entry. The button returns when the service is enabled again.
+
 ## 🚀 Usage
 
 **Where the entry is**: after installing and restarting `dsh web`, open **Settings** — the left sidebar shows **"Phone access"** at the top level (same level as General / Models):

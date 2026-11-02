@@ -89,6 +89,9 @@ function redactStatus(s) {
   };
 }
 
+// client/mobile/mobile-apply.tsx
+var import_dsh_client_store = require("@deepseek-ai/dsh-client-store");
+
 // client/mobile/MobileNavToggle.tsx
 var primitives = __toESM(require("@deepseek-ai/dsh-client-ui-primitives"), 1);
 
@@ -415,8 +418,9 @@ function MobileNavOverlay({ toggleSidebar, t }) {
 // client/mobile/MobileDrawerFooter.tsx
 var primitives3 = __toESM(require("@deepseek-ai/dsh-client-ui-primitives"), 1);
 var icons3 = resolveMobileIcons(primitives3);
-function MobileDrawerFooter({ useSessions, downloadSessionLog, toggleSidebar, t }) {
+function MobileDrawerFooter({ useSessions, useSessionLogDownload, toggleSidebar, t }) {
   const sessionId = useSessions((state) => state.current);
+  const downloadSessionLog = useSessionLogDownload((state) => state.download);
   const openExplorer = () => {
     document.querySelector('[data-mobile-nav="frame"]')?.setAttribute("data-aionui-explorer-open", "");
     toggleSidebar();
@@ -432,7 +436,7 @@ function MobileDrawerFooter({ useSessions, downloadSessionLog, toggleSidebar, t 
     },
     /* @__PURE__ */ React.createElement(MobileIcon, { icon: icons3.panelLeft, name: "panelLeft", size: 14 }),
     /* @__PURE__ */ React.createElement("span", null, t("files"))
-  ), /* @__PURE__ */ React.createElement(
+  ), downloadSessionLog !== void 0 && /* @__PURE__ */ React.createElement(
     "button",
     {
       type: "button",
@@ -1936,13 +1940,22 @@ function mobileApply(ctx) {
       toggleSidebar: () => ctx.layout.toggleSidebar()
     })
   }, MobileNavOverlay));
+  const sessionLogDownload = (0, import_dsh_client_store.createSnapshotStore)({ download: void 0 });
+  ctx.inject(["sessionLogDownload"], (scope) => {
+    scope.effect(() => {
+      sessionLogDownload.set({ download: (sessionId) => scope.sessionLogDownload.download(sessionId) });
+      return () => {
+        sessionLogDownload.set({ download: void 0 });
+      };
+    }, "dsh-mobile-nav: optional session log download");
+  });
   ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register({
     name: "sidebar.footer.action",
     id: "mobile-nav-session-log",
     order: 10,
     locale: NS,
     inject: () => ({
-      downloadSessionLog: (sessionId) => ctx.sessionLogDownload.download(sessionId),
+      hooks: { sessionLogDownload },
       toggleSidebar: () => ctx.layout.toggleSidebar()
     })
   }, MobileDrawerFooter));
@@ -2111,7 +2124,7 @@ var en2 = {
 
 // client/index.jsx
 var name = "dsh-pocket";
-var inject = ["slots", "connection", "layout", "locale", "sessionLogDownload"];
+var inject = ["slots", "connection", "layout", "locale"];
 function fmt(t, key, vars) {
   let s = t(key);
   if (vars) {
