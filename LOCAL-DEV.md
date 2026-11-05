@@ -32,7 +32,7 @@ ls -l dsh-pocket
 
 ```sh
 node client/build.mjs     # 只改后端可跳过
-npm test                  # 建议顺手跑一遍（当前 109 个用例）
+pnpm test                  # 建议顺手跑一遍（当前 109 个用例）
 ```
 
 ### 重启 dsh web
@@ -94,7 +94,7 @@ ls -l ~/.dsh/profiles/web/node_modules/dsh-pocket
 ## 注意事项
 
 - **软链期间，你日常用的 dsh web 跑的都是本地仓库代码**（包括未提交的改动），而别人通过 npm 装到的仍是发布版——两边互不影响。
-- 本地仓库需要装过依赖（`npm install`），否则 `lib/` 用到的 `cordis` / `cosmokit` 等解析不到，插件会静默加载失败。
+- 本地仓库需要装过依赖（`pnpm install`），否则 `lib/` 用到的 `cordis` / `cosmokit` 等解析不到，插件会静默加载失败。
 - 改完 `client/` 忘了打包，界面不会变（dsh web 加载的是 `client/client.js` 产物，不是 `index.jsx` 源码）。
 - 电脑重启后自己正常启动 dsh web 即可，软链是持久的，仍然加载本地代码。
 

@@ -18,13 +18,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # pnpm 版本由 package.json 的 packageManager 决定，action 从那读取。
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm ci
-      - run: npm test
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
       - name: Publish release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm run release
+        run: pnpm run release

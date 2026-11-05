@@ -199,9 +199,9 @@ Such tools take over all traffic and often cut cloudflared's tunnel-edge connect
 ## 🛠 Development
 
 ```sh
-npm install
+pnpm install
 node client/build.mjs   # rebuild after editing client/
-npm test                # proxy / auth / compression / tunnel / service / RPC / settings (109 tests)
+pnpm test                # proxy / auth / compression / tunnel / service / RPC / settings (109 tests)
 ```
 
 **Want to try your changes locally without publishing?** Point the installed plugin at your local checkout with a symlink and restart dsh web. Full steps (including switching back to the npm release) are in [LOCAL-DEV.md](./LOCAL-DEV.md).
