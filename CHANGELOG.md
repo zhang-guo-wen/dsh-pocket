@@ -1,3 +1,16 @@
+# [2.12.1](https://github.com/zhang-guo-wen/dsh-pocket/compare/v2.12.0...v2.12.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **client:** 会话日志下载改为可选，宿主未提供 `dsh-session-log-export` 时不再报错（`@deepseek-ai/dsh-session-log-export/client` 仅作类型引用，不进 `dsh.client.inject`）
+* **mobile:** 文件链接点击交还 DSH 右侧栏预览，不再被插件拦截
+* **client:** 精简设置页并移除自动更新入口（自动更新由 Arcuchi Harness 桌面壳负责）
+
+### Maintenance
+
+* 切换包管理与发布流程到 pnpm（`pnpm-workspace.yaml` + `pnpm-lock.yaml`）
+
 # [2.12.0](https://github.com/shaobeichen/dsh-pocket/compare/v2.11.0...v2.12.0) (2026-10-17)
 
 
