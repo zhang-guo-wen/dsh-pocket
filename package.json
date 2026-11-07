@@ -43,7 +43,8 @@
     "@deepseek-ai/cordis": "^4.0.1"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22",
+    "dsh": ">=0.2.0-rc.1 <0.3.0-0"
   },
   "license": "GPL-2.0",
   "keywords": [
@@ -82,5 +83,5 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "version": "2.12.1"
+  "version": "2.12.2"
 }
