@@ -5,7 +5,8 @@ import { NS } from './locales.ts'
 import { MobileIcon } from './MobileIcon.tsx'
 import { resolveMobileIcons } from './icon-compat.mjs'
 import {
-  DRAWER_SELECTOR,
+  findDrawer,
+  hasNativeDrawer,
   TOGGLE_SELECTOR,
   isOverlayTap,
   navTargetFor,
@@ -130,8 +131,7 @@ export function MobileNavOverlay({ toggleSidebar, t }: MobileNavOverlayProps) {
     let navObserver: MutationObserver | null = null
     let navTimer: number | null = null
 
-    const drawerRoot = (): HTMLElement | null =>
-      document.querySelector<HTMLElement>(DRAWER_SELECTOR)
+    const drawerRoot = (): HTMLElement | null => findDrawer() as HTMLElement | null
 
     const disarmNav = (): void => {
       navObserver?.disconnect()
@@ -255,6 +255,10 @@ export function MobileNavOverlay({ toggleSidebar, t }: MobileNavOverlayProps) {
       if (document.querySelector('[aria-modal="true"]') !== null) return
       const target = event.target as HTMLElement | null
       if (target === null) return
+      // 宿主自带抽屉（DSH 0.2.2 起）时，点遮罩关闭是它自己 drawerMask 的
+      // onClick；这里再 toggle 一次会把刚关上的抽屉又推开，手机上看就是
+      // 「点了没反应」。自带抽屉一律交给宿主。
+      if (hasNativeDrawer(document.querySelector('[data-mobile-nav="frame"]'))) return
       if (target.closest(TOGGLE_SELECTOR) !== null) return
       // Portaled overlays (issue #72): the workspace section's "视图选项" /
       // "添加工作区" and the session row kebab all open menus that live on
@@ -265,7 +269,7 @@ export function MobileNavOverlay({ toggleSidebar, t }: MobileNavOverlayProps) {
       if (isOverlayTap(target)) return
       const frame = document.querySelector('[data-mobile-nav="frame"]')
       if (frame === null || frame.hasAttribute('data-sidebar-collapsed')) return
-      const drawer = document.querySelector<HTMLElement>(DRAWER_SELECTOR)
+      const drawer = findDrawer()
       if (drawer !== null && drawer.contains(target)) return
       toggleSidebar()
     }

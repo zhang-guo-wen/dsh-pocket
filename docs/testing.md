@@ -45,3 +45,45 @@ kind: "package-reference"
 - 未验证手机真机、视口矩阵、主题与实际日志 ZIP 下载；组件行为结论来自上述产物测试。
 
 ---
+## 2、手机端会话列表不显示也点不动（DSH 0.2.2-alpha.3 宿主自带抽屉）（2026-11-07，产物 `b3165134` / host `06796bc6`）
+
+### 环境与产物绑定
+
+| 项 | 值 |
+|---|---|
+| 日期 | 2026-11-07T14:13:05+08:00 |
+| 插件 | dsh-pocket@2.12.2（HEAD c9cdd68，工作树 5 项未提交） |
+| 宿主 | @deepseek-ai/dsh@0.2.2-alpha.3（隔离实例；桌面端 ArcuchiHarness 的 `dsh-desktop-runtime` 同为 0.2.2-alpha.3） |
+| DSH_HOME | `C:\02-codespace\DeepSeek\.scratch\harness-tests\pocket-mobile-list-0.2.2-alpha.3-z8whjg` |
+| 端口 / URL | 49221 / `http://127.0.0.1:49221/?token=***` |
+| Node | v24.12.0 |
+| lib/index.js | 21969 字节，SHA256 `06796bc6d7fcda2ae978e8f8ae86b53f594ca41fede1116d601bbd43218a8476` |
+| client/client.js（浏览器产物） | 133852 字节，SHA256 `b3165134c41b6559ce690eea62af5003ef7f39826439d98d5f40555d330ff4f8` |
+| 证据文件 | `.scratch/test-system/runs/2026-11-07-141300-dsh-pocket.json` |
+
+### 车道结果
+
+| 车道 | 状态 | 退出码 | 耗时 |
+|---|---|---|---|
+| unit | failed | 1 | 12.0s |
+
+失败项与本次改动无关：`test/tunnel-args.test.js` 4 项在 Windows 上 spawn 无扩展名的 cloudflared 桩时报 `ENOENT`（与第 1 节记录的既有失败相同）。改动相关的 35 项断言全通过（`test/mobile-nav.test.js`、`layout-mode`、`icon-compat`、`locales`）。
+
+### 逐项读数
+
+- **复现（修复前产物）**：390×890、deviceScaleFactor=3 的手机视口下渲染整页空白，只有左上角那颗抽屉图标；DOM 里 `会话A / 测试会话一` 都在。量到的 frame 网格是 `400px 0px 0px`（居中列 `x=400, width=0`），抽屉被推到 `x=-280`。
+- **根因**：宿主 0.2.2 起自己带手机抽屉（`viewport < 768` ⇒ frame 加 `data-sidebar-drawer`、第一个网格子元素变成 `drawerMask`、inline 写 `grid-template-columns: 0px minmax(0,1fr) minmax(0,0px)`）。插件的 `grid-template-columns: minmax(0,1fr) 0 0 !important` 与 `> :nth-child(2)` 是按「窄屏下第一个子元素＝侧边栏」写的旧结构，结果遮罩被当成抽屉、主内容列落进 0px 轨：会话列表有数据却看不到，页面上也没有任何可点的东西。
+- **修复后 @390×890**：frame 网格 `0px 390px 0px`，主内容列 `0×0 390×890` 占满；点可见的「打开侧边栏」⇒ `data-sidebar-collapsed=false`、侧边栏 `0,0,280,890`；会话行 `[8,346,264,32]`、`visibility: visible`、`elementFromPoint` 命中行本身；点「会话A」⇒ 主区切到该会话（`会话A 对话 轨迹 … 处理失败`）且抽屉自动收起。
+- **视口矩阵**：360 / 390 / 430 / 600 / 767（宿主自带抽屉路径）与 768 / 900 / 1023（旧结构路径）都满足：抽屉 280 宽打开、行可点、点击后导航且抽屉关闭；1024 起 `body[data-dsh-pocket-layout=desktop]`，插件移动端效果整体不挂。
+- **对照组**：同一实例加 `dsh-layout=desktop`（插件不注入任何移动样式，只用宿主自带抽屉）在 500×890 下抽屉与行同样正常，说明问题来自插件与宿主结构的冲突，不是宿主抽屉本身。
+- **旧规则回放**：把修复前的四条 CSS 重新注入（546×890）可复现「左侧 280px 抽屉、主内容被推到视口外」，与用户截图同一形态。
+- 截图：`.scratch/pocket-mobile-probe/shots-accept2/w390-1-main.png`（主界面）、`w390-2-drawer.png`（抽屉列出会话）、`w390-3-after-row.png`（点行后）、`shots-old/old-546-open.png`（修复前形态）。
+
+### 本节未覆盖
+
+- 未在用户日常实例（`~/.arcuchi`，其中 `dsh-pocket` 当前是 disabled 状态）与手机真机上验证；未接隧道（cloudflare）链路，只在 127.0.0.1 上验收。
+- 未覆盖深色主题、`prefers-reduced-motion`、软键盘与安全区（`env(safe-area-inset-top)` 在桌面 Chromium 上恒为 0）。
+- 未验证「宿主自带抽屉」下插件自己的遮罩被隐藏后的观感是否与宿主遮罩完全一致（只量到点击链路正常）。
+- 用户实例里同时装了 ui-beautify / task-list / whiteboard 等插件，本记录只在「仅装 pocket」的隔离实例上验证。
+
+---

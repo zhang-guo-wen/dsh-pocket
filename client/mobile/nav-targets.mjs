@@ -2,10 +2,42 @@
 // 引入（client 侧是 esbuild 打进 bundle 的，测试里没有 DOM 可用）。
 
 /**
- * 抽屉本体：AppFrame 的第一个网格子元素，即被拉成抽屉的侧边栏列。
+ * 抽屉本体（宿主自带抽屉的版本，DSH 0.2.2 起）：AppFrame 内部结构变了——
+ * 宽 < 768 时宿主自己把侧边栏列拉成抽屉，并在第一个网格位置插入一个
+ * `drawerMask`（点它关闭抽屉的全屏遮罩）。所以「第一个子元素」不再等于侧边栏，
+ * 只能按列名找：CSS Module 的哈希前缀每次构建都变，后缀 `_sidebarCol` 稳定。
  * @type {string}
  */
-export const DRAWER_SELECTOR = '[data-mobile-nav="frame"] > :first-child'
+export const DRAWER_COLUMN_SELECTOR = '[data-mobile-nav="frame"] > [class$="_sidebarCol"]'
+
+/**
+ * 抽屉本体的旧口径：没有自带抽屉的宿主里，第一个网格子元素就是侧边栏列。
+ * @type {string}
+ */
+export const LEGACY_DRAWER_SELECTOR = '[data-mobile-nav="frame"] > :first-child'
+
+/**
+ * 当前页面的抽屉根节点：优先按列名找（新宿主），找不到再退回第一个子元素
+ * （老宿主）。两代结构都在用，不能只留一条选择器。
+ * @param {Document | Element | null} [root] - 查询根，默认当前 document。
+ * @returns {Element | null} 抽屉根节点。
+ */
+export function findDrawer(root) {
+  const scope = root ?? (typeof document === 'undefined' ? null : document)
+  if (scope === null || typeof scope.querySelector !== 'function') return null
+  return scope.querySelector(DRAWER_COLUMN_SELECTOR) ?? scope.querySelector(LEGACY_DRAWER_SELECTOR)
+}
+
+/**
+ * 宿主是否自带移动端抽屉（0.2.2 起）。自带时网格改写、抽屉定位、点外部关闭
+ * 全部交给宿主，插件再插手就是两套抽屉打架。
+ * @param {Element | null} frame - AppFrame 元素。
+ * @returns {boolean}
+ */
+export function hasNativeDrawer(frame) {
+  if (frame == null || typeof frame.hasAttribute !== 'function') return false
+  return frame.hasAttribute('data-sidebar-drawer')
+}
 
 /** 抽屉开关（会话头部那颗按钮）——点它不该被"点抽屉外就关"二次触发。 */
 export const TOGGLE_SELECTOR = '[data-mobile-nav="toggle"]'

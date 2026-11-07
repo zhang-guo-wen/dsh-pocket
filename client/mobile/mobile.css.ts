@@ -177,18 +177,33 @@ export const MOBILE_CSS = `
      center every pixel and keep the details track at zero. The top padding
      clears the status bar / notch for every in-flow surface (session header,
      messages, composer); the absolutely-positioned drawer is unaffected (its
-     containing block is the frame's padding box, i.e. still the frame top). */
+     containing block is the frame's padding box, i.e. still the frame top).
+
+     DSH 0.2.2+ ships its own phone drawer: below 768px the frame carries a
+     data-sidebar-drawer attribute, the sidebar column is absolutely positioned
+     by the host, and the host writes its own inline
+     grid-template-columns: 0px minmax(0px, 1fr) minmax(0px, 0px) plus a
+     first-child drawerMask. Our old restructure then landed on the wrong
+     elements: the mask (child 1) got the drawer box while :nth-child(2) hit
+     the sidebar instead of the center column, so the center column fell into a
+     0px track — the whole app rendered 0px wide with the session list stranded
+     off-screen: it had data, but nothing showed and nothing could be tapped.
+     Every restructure rule below is therefore scoped to hosts WITHOUT a native
+     drawer; on 0.2.2+ only the safe-area padding and typography rules apply. */
   [data-mobile-nav="frame"] {
     position: relative !important;
-    grid-template-columns: minmax(0, 1fr) 0 0 !important;
     padding-top: env(safe-area-inset-top, 0px) !important;
+  }
+
+  [data-mobile-nav="frame"]:not([data-sidebar-drawer]) {
+    grid-template-columns: minmax(0, 1fr) 0 0 !important;
   }
 
   /* 主内容列（第 2 个网格子元素）在官方样式里有显式 grid-column: 2——
      网格被压缩成 [1fr, 0, 0] 后它会落在 0px 的第 2 轨，整个主界面被挤出
      视口（只剩背景图）。必须显式把它拉回第 1 轨（issue #5）。
      第 3 列（details）保持 0 轨即可，无需处理。 */
-  [data-mobile-nav="frame"] > :nth-child(2) {
+  [data-mobile-nav="frame"]:not([data-sidebar-drawer]) > :nth-child(2) {
     grid-column: 1 !important;
     grid-row: 1 !important;
     min-width: 0 !important;
@@ -217,7 +232,7 @@ export const MOBILE_CSS = `
      #67: that mask sat on top of the 600 drawer and ate every tap). Still
      far under the fixed-position banners/toasts (z 9999) that float at the
      viewport level. */
-  [data-mobile-nav="frame"] > :first-child {
+  [data-mobile-nav="frame"]:not([data-sidebar-drawer]) > :first-child {
     position: absolute !important;
     inset: 0 auto 0 0 !important;
     width: max-content !important;
@@ -247,8 +262,14 @@ export const MOBILE_CSS = `
      overflow:hidden drawer to scrollLeft=102, and every static child (plus the
      fixed overlay) shifts 102px off-screen. With transform:none the overlay is
      viewport-anchored: it dims the full screen and the sheet sits at left:8. */
-  [data-mobile-nav="frame"]:not([data-sidebar-collapsed]) > :first-child {
+  [data-mobile-nav="frame"]:not([data-sidebar-drawer]):not([data-sidebar-collapsed]) > :first-child {
     transform: none !important;
+  }
+
+  /* 宿主自带抽屉时，遮罩（含点外部关闭）由它的 drawerMask 负责。插件自己的
+     那层只做重复压暗，还会让「点一下关不掉」看起来像卡住，直接不显示。 */
+  [data-mobile-nav="frame"][data-sidebar-drawer] [data-mobile-nav="backdrop"] {
+    display: none !important;
   }
 
   /* Kill a competing full-screen mask (issue #67).

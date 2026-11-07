@@ -191,7 +191,17 @@ var import_react = require("react");
 var primitives2 = __toESM(require("@deepseek-ai/dsh-client-ui-primitives"), 1);
 
 // client/mobile/nav-targets.mjs
-var DRAWER_SELECTOR = '[data-mobile-nav="frame"] > :first-child';
+var DRAWER_COLUMN_SELECTOR = '[data-mobile-nav="frame"] > [class$="_sidebarCol"]';
+var LEGACY_DRAWER_SELECTOR = '[data-mobile-nav="frame"] > :first-child';
+function findDrawer(root) {
+  const scope = root ?? (typeof document === "undefined" ? null : document);
+  if (scope === null || typeof scope.querySelector !== "function") return null;
+  return scope.querySelector(DRAWER_COLUMN_SELECTOR) ?? scope.querySelector(LEGACY_DRAWER_SELECTOR);
+}
+function hasNativeDrawer(frame) {
+  if (frame == null || typeof frame.hasAttribute !== "function") return false;
+  return frame.hasAttribute("data-sidebar-drawer");
+}
 var TOGGLE_SELECTOR = '[data-mobile-nav="toggle"]';
 var NAV_TARGETS = [
   "button[data-dsh-taskboard-entry]",
@@ -295,7 +305,7 @@ function MobileNavOverlay({ toggleSidebar, t }) {
     let navClickArrived = false;
     let navObserver = null;
     let navTimer = null;
-    const drawerRoot = () => document.querySelector(DRAWER_SELECTOR);
+    const drawerRoot = () => findDrawer();
     const disarmNav = () => {
       navObserver?.disconnect();
       navObserver = null;
@@ -390,11 +400,12 @@ function MobileNavOverlay({ toggleSidebar, t }) {
       if (document.querySelector('[aria-modal="true"]') !== null) return;
       const target = event.target;
       if (target === null) return;
+      if (hasNativeDrawer(document.querySelector('[data-mobile-nav="frame"]'))) return;
       if (target.closest(TOGGLE_SELECTOR) !== null) return;
       if (isOverlayTap(target)) return;
       const frame = document.querySelector('[data-mobile-nav="frame"]');
       if (frame === null || frame.hasAttribute("data-sidebar-collapsed")) return;
-      const drawer = document.querySelector(DRAWER_SELECTOR);
+      const drawer = findDrawer();
       if (drawer !== null && drawer.contains(target)) return;
       toggleSidebar();
     };
@@ -781,18 +792,33 @@ var MOBILE_CSS = `
      center every pixel and keep the details track at zero. The top padding
      clears the status bar / notch for every in-flow surface (session header,
      messages, composer); the absolutely-positioned drawer is unaffected (its
-     containing block is the frame's padding box, i.e. still the frame top). */
+     containing block is the frame's padding box, i.e. still the frame top).
+
+     DSH 0.2.2+ ships its own phone drawer: below 768px the frame carries a
+     data-sidebar-drawer attribute, the sidebar column is absolutely positioned
+     by the host, and the host writes its own inline
+     grid-template-columns: 0px minmax(0px, 1fr) minmax(0px, 0px) plus a
+     first-child drawerMask. Our old restructure then landed on the wrong
+     elements: the mask (child 1) got the drawer box while :nth-child(2) hit
+     the sidebar instead of the center column, so the center column fell into a
+     0px track \u2014 the whole app rendered 0px wide with the session list stranded
+     off-screen: it had data, but nothing showed and nothing could be tapped.
+     Every restructure rule below is therefore scoped to hosts WITHOUT a native
+     drawer; on 0.2.2+ only the safe-area padding and typography rules apply. */
   [data-mobile-nav="frame"] {
     position: relative !important;
-    grid-template-columns: minmax(0, 1fr) 0 0 !important;
     padding-top: env(safe-area-inset-top, 0px) !important;
+  }
+
+  [data-mobile-nav="frame"]:not([data-sidebar-drawer]) {
+    grid-template-columns: minmax(0, 1fr) 0 0 !important;
   }
 
   /* \u4E3B\u5185\u5BB9\u5217\uFF08\u7B2C 2 \u4E2A\u7F51\u683C\u5B50\u5143\u7D20\uFF09\u5728\u5B98\u65B9\u6837\u5F0F\u91CC\u6709\u663E\u5F0F grid-column: 2\u2014\u2014
      \u7F51\u683C\u88AB\u538B\u7F29\u6210 [1fr, 0, 0] \u540E\u5B83\u4F1A\u843D\u5728 0px \u7684\u7B2C 2 \u8F68\uFF0C\u6574\u4E2A\u4E3B\u754C\u9762\u88AB\u6324\u51FA
      \u89C6\u53E3\uFF08\u53EA\u5269\u80CC\u666F\u56FE\uFF09\u3002\u5FC5\u987B\u663E\u5F0F\u628A\u5B83\u62C9\u56DE\u7B2C 1 \u8F68\uFF08issue #5\uFF09\u3002
      \u7B2C 3 \u5217\uFF08details\uFF09\u4FDD\u6301 0 \u8F68\u5373\u53EF\uFF0C\u65E0\u9700\u5904\u7406\u3002 */
-  [data-mobile-nav="frame"] > :nth-child(2) {
+  [data-mobile-nav="frame"]:not([data-sidebar-drawer]) > :nth-child(2) {
     grid-column: 1 !important;
     grid-row: 1 !important;
     min-width: 0 !important;
@@ -821,7 +847,7 @@ var MOBILE_CSS = `
      #67: that mask sat on top of the 600 drawer and ate every tap). Still
      far under the fixed-position banners/toasts (z 9999) that float at the
      viewport level. */
-  [data-mobile-nav="frame"] > :first-child {
+  [data-mobile-nav="frame"]:not([data-sidebar-drawer]) > :first-child {
     position: absolute !important;
     inset: 0 auto 0 0 !important;
     width: max-content !important;
@@ -851,8 +877,14 @@ var MOBILE_CSS = `
      overflow:hidden drawer to scrollLeft=102, and every static child (plus the
      fixed overlay) shifts 102px off-screen. With transform:none the overlay is
      viewport-anchored: it dims the full screen and the sheet sits at left:8. */
-  [data-mobile-nav="frame"]:not([data-sidebar-collapsed]) > :first-child {
+  [data-mobile-nav="frame"]:not([data-sidebar-drawer]):not([data-sidebar-collapsed]) > :first-child {
     transform: none !important;
+  }
+
+  /* \u5BBF\u4E3B\u81EA\u5E26\u62BD\u5C49\u65F6\uFF0C\u906E\u7F69\uFF08\u542B\u70B9\u5916\u90E8\u5173\u95ED\uFF09\u7531\u5B83\u7684 drawerMask \u8D1F\u8D23\u3002\u63D2\u4EF6\u81EA\u5DF1\u7684
+     \u90A3\u5C42\u53EA\u505A\u91CD\u590D\u538B\u6697\uFF0C\u8FD8\u4F1A\u8BA9\u300C\u70B9\u4E00\u4E0B\u5173\u4E0D\u6389\u300D\u770B\u8D77\u6765\u50CF\u5361\u4F4F\uFF0C\u76F4\u63A5\u4E0D\u663E\u793A\u3002 */
+  [data-mobile-nav="frame"][data-sidebar-drawer] [data-mobile-nav="backdrop"] {
+    display: none !important;
   }
 
   /* Kill a competing full-screen mask (issue #67).

@@ -5,11 +5,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const {
-  DRAWER_SELECTOR,
+  DRAWER_COLUMN_SELECTOR,
+  LEGACY_DRAWER_SELECTOR,
   TOGGLE_SELECTOR,
   NAV_TARGETS,
   NAV_EXCLUDE,
   OVERLAY_SELECTOR,
+  findDrawer,
+  hasNativeDrawer,
   navTargetFor,
   isOverlayTap,
 } = await import('../client/mobile/nav-targets.mjs');
@@ -84,11 +87,18 @@ test('浮层内的点击被识别为 overlay（不该关抽屉）—— issue #7
 
 test('选择器常量与 MobileNavOverlay 的用法保持一致', () => {
   const src = readFileSync(new URL('../client/mobile/MobileNavOverlay.tsx', import.meta.url), 'utf8');
-  assert.equal(DRAWER_SELECTOR, '[data-mobile-nav="frame"] > :first-child');
+  // DSH 0.2.2 起 AppFrame 的第一个网格子元素是 drawerMask（宿主自带抽屉的
+  // 遮罩），抽屉本体只能按列名找，老宿主再退回第一个子元素。
+  assert.equal(DRAWER_COLUMN_SELECTOR, '[data-mobile-nav="frame"] > [class$="_sidebarCol"]');
+  assert.equal(LEGACY_DRAWER_SELECTOR, '[data-mobile-nav="frame"] > :first-child');
   assert.equal(TOGGLE_SELECTOR, '[data-mobile-nav="toggle"]');
   assert.ok(
-    src.includes("document.querySelector<HTMLElement>(DRAWER_SELECTOR)"),
-    '抽屉查询应复用 DRAWER_SELECTOR，避免与 CSS 里的选择器漂移',
+    src.includes('findDrawer()'),
+    '抽屉查询应复用 findDrawer()，避免与 CSS 里的选择器漂移',
+  );
+  assert.ok(
+    src.includes('hasNativeDrawer('),
+    '宿主自带抽屉时必须让开，不能两套抽屉互相 toggle（会话列表点不动）',
   );
   assert.ok(src.includes('isOverlayTap(target)'), '点抽屉外的处理必须先豁免浮层（issue #72）');
   assert.ok(
@@ -232,4 +242,59 @@ test('打包产物：mobile-apply 引用的组件都有 import 且有定义', ()
     const defs = (bundle.match(new RegExp(`(?:function\\s+${name}\\b|\\b${name}\\s*=)`, 'g')) ?? []).length;
     assert.ok(defs >= 1, `${name} 在打包产物里只有引用、没有定义 —— 漏 import 会让整个插件加载失败`);
   }
+});
+
+// —— 宿主自带抽屉（DSH 0.2.2+）：手机上一片空白 / 会话列表点不动 ——
+
+const fakeRoot = (found) => ({ querySelector: (sel) => found[sel] ?? null });
+
+test('findDrawer 优先按 sidebarCol 列名找，老宿主退回第一个子元素', () => {
+  const column = { kind: 'column' };
+  const firstChild = { kind: 'mask' };
+  assert.equal(
+    findDrawer(fakeRoot({ [DRAWER_COLUMN_SELECTOR]: column, [LEGACY_DRAWER_SELECTOR]: firstChild })),
+    column,
+    '新宿主里第一个子元素是 drawerMask，绝不能被当成抽屉',
+  );
+  assert.equal(findDrawer(fakeRoot({ [LEGACY_DRAWER_SELECTOR]: firstChild })), firstChild);
+  assert.equal(findDrawer(fakeRoot({})), null);
+  assert.equal(findDrawer(null), null, '无 DOM 环境不能抛错');
+});
+
+test('hasNativeDrawer 只认 data-sidebar-drawer', () => {
+  assert.equal(hasNativeDrawer({ hasAttribute: (n) => n === 'data-sidebar-drawer' }), true);
+  assert.equal(hasNativeDrawer({ hasAttribute: () => false }), false);
+  assert.equal(hasNativeDrawer(null), false);
+  assert.equal(hasNativeDrawer({}), false);
+});
+
+test('抽屉网格改写只在宿主没有自带抽屉时生效 —— 否则主内容被压成 0 宽', () => {
+  const css = readFileSync(new URL('../client/mobile/mobile.css.ts', import.meta.url), 'utf8');
+  // 宿主 0.2.2 自己写 inline grid-template-columns: 0px minmax(0,1fr) 0px，
+  // 并自带 drawerMask 作第一个子元素。我们再把网格改成 [1fr, 0, 0] 并把
+  // :nth-child(2) 拉回第 1 轨，就变成「遮罩当成抽屉、主内容列落到 0px 轨」：
+  // 整页空白，会话列表有数据却既看不到也点不动。
+  assert.ok(
+    !/\[data-mobile-nav="frame"\]\s*\{[^}]*grid-template-columns/.test(css),
+    'frame 的网格改写必须带 :not([data-sidebar-drawer])，不能无条件覆盖宿主布局',
+  );
+  assert.match(
+    css,
+    /\[data-mobile-nav="frame"\]:not\(\[data-sidebar-drawer\]\)\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*0\s*0\s*!/,
+  );
+  assert.match(
+    css,
+    /\[data-mobile-nav="frame"\]:not\(\[data-sidebar-drawer\]\)\s*>\s*:nth-child\(2\)/,
+    '把主内容列拉回第 1 轨的规则同样只对老宿主生效',
+  );
+  assert.match(
+    css,
+    /\[data-mobile-nav="frame"\]:not\(\[data-sidebar-drawer\]\)\s*>\s*:first-child\s*\{/,
+    '抽屉定位不能落到宿主的 drawerMask 上',
+  );
+  assert.match(
+    css,
+    /\[data-mobile-nav="frame"\]\[data-sidebar-drawer\]\s*\[data-mobile-nav="backdrop"\]/,
+    '宿主自带抽屉时不再叠一层自己的遮罩',
+  );
 });
