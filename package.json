@@ -1,5 +1,5 @@
 {
-  "name": "dsh-pocket",
+  "name": "@guowenzhang/dsh-pocket",
   "packageManager": "pnpm@11.28.9",
   "description": "把 DeepSeek Harness 装进你的口袋：一个包、一个设置页，手机扫码即同步访问电脑上的 DSH（局域网 + 公网，实时同屏）。",
   "type": "module",
@@ -20,6 +20,7 @@
     "client",
     "cordis.patch.yml",
     "README.md",
+    "README.en.md",
     "LICENSE"
   ],
   "scripts": {
@@ -73,12 +74,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shaobeichen/dsh-pocket.git"
+    "url": "git+https://github.com/zhang-guo-wen/dsh-pocket.git"
   },
   "bugs": {
-    "url": "https://github.com/shaobeichen/dsh-pocket/issues"
+    "url": "https://github.com/zhang-guo-wen/dsh-pocket/issues"
   },
-  "homepage": "https://github.com/shaobeichen/dsh-pocket",
+  "homepage": "https://github.com/zhang-guo-wen/dsh-pocket#readme",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"

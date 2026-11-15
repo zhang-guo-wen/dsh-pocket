@@ -1,5 +1,5 @@
 // dsh-pocket 网页客户端打包：client/index.jsx → client/client.js
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -7,7 +7,11 @@ import { build } from 'esbuild';
 const sourceDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(sourceDir, '..');
 const outputPath = resolve(packageRoot, 'client/client.js');
-const loaderId = process.env.DSH_POCKET_CLIENT_ID ?? 'dsh-pocket';
+// handoff id 必须等于 package.json 的 name：客户端加载器按包名把这份产物挂到
+// 主机的插件条目上。改名（dsh-pocket → @guowenzhang/dsh-pocket）后不跟着改，
+// 手机端就会找不到这份 client bundle。
+const loaderId = process.env.DSH_POCKET_CLIENT_ID
+  ?? JSON.parse(await readFile(resolve(packageRoot, 'package.json'), 'utf8')).name;
 
 const result = await build({
   entryPoints: [resolve(sourceDir, 'index.jsx')],
